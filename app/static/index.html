@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CineSeat</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;background:#111;color:#eee}
+header{background:#e50914;padding:14px 20px;font-size:22px;font-weight:700}
+main{padding:20px;max-width:900px;margin:auto}
+.card{background:#1d1d1d;border-radius:10px;padding:14px;margin:8px 0;cursor:pointer}
+.card:hover{outline:2px solid #e50914}
+button{background:#e50914;color:#fff;border:0;border-radius:6px;padding:10px 16px;cursor:pointer}
+button:disabled{opacity:.4}
+.grid{display:grid;grid-template-columns:repeat(10,36px);gap:6px;margin:16px 0}
+.seat{width:36px;height:30px;border-radius:5px;border:1px solid #555;background:#2a2a2a;color:#ccc;font-size:11px;padding:0}
+.seat.PREMIUM{border-color:#d4af37}.seat.selected{background:#2ecc71;color:#000}.seat.booked{background:#555;cursor:not-allowed}
+.screen{text-align:center;color:#888;border-top:3px solid #888;margin-top:10px;padding-top:4px;width:400px}
+input{padding:9px;border-radius:6px;border:0;width:240px}
+#error{color:#ff6b6b}
+</style></head>
+<body><header>🎬 CineSeat</header><main>
+<section id="movies"></section>
+<section id="shows" hidden></section>
+<section id="seatmap" hidden>
+  <div class="screen">SCREEN THIS WAY</div><div class="grid" id="grid"></div>
+  <p>Selected: <span id="selected">none</span> · Total: ₹<span id="total">0</span></p>
+  <input id="email" placeholder="you@example.com" type="email">
+  <button id="book" disabled>Book tickets</button><p id="error"></p>
+</section>
+<section id="confirmation" hidden></section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+let show = null, picked = [];
+async function j(url, opts) { const r = await fetch(url, opts); const b = await r.json(); if (!r.ok) throw new Error(b.detail); return b; }
+async function loadMovies() {
+  const movies = await j("/api/movies");
+  $("#movies").innerHTML = "<h2>Now showing</h2>" + movies.map(m =>
+    `<div class="card" data-testid="movie-${m.id}" onclick="loadShows(${m.id})"><b>${m.title}</b> · ${m.language} · ${m.genre} · ⭐ ${m.rating}</div>`).join("");
+}
+async function loadShows(id) {
+  const shows = await j(`/api/movies/${id}/shows`);
+  $("#shows").hidden = false;
+  $("#shows").innerHTML = "<h2>Pick a show</h2>" + shows.map(s =>
+    `<div class="card" data-testid="show-${s.id}" onclick="loadSeats(${s.id})">${s.theatre} · ${s.time}</div>`).join("");
+}
+async function loadSeats(id) {
+  show = id; picked = []; update();
+  const seats = await j(`/api/shows/${id}/seats`);
+  $("#seatmap").hidden = false;
+  $("#grid").innerHTML = seats.map(s =>
+    `<button class="seat ${s.class} ${s.booked ? "booked" : ""}" data-seat="${s.seat}" ${s.booked ? "disabled" : ""} onclick="toggle('${s.seat}', this)">${s.seat}</button>`).join("");
+}
+function toggle(seat, el) {
+  picked = picked.includes(seat) ? picked.filter(s => s !== seat) : [...picked, seat];
+  el.classList.toggle("selected"); update();
+}
+async function update() {
+  $("#selected").textContent = picked.join(", ") || "none";
+  $("#book").disabled = !picked.length;
+  if (!picked.length) { $("#total").textContent = 0; return; }
+  try { const q = await j("/api/quote", post({show_id: show, seats: picked, email: "quote@cineseat.dev"}));
+        $("#total").textContent = q.total; $("#error").textContent = ""; }
+  catch (e) { $("#error").textContent = e.message; }
+}
+const post = body => ({method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+$("#book").onclick = async () => {
+  try {
+    const b = await j("/api/bookings", post({show_id: show, seats: picked, email: $("#email").value}));
+    $("#seatmap").hidden = true;
+    $("#confirmation").hidden = false;
+    $("#confirmation").innerHTML = `<h2 data-testid="confirmed">Booking confirmed 🎉</h2><p>ID <b id="booking-id">${b.id}</b> · Seats ${b.seats.join(", ")} · Paid ₹${b.total}</p>`;
+  } catch (e) { $("#error").textContent = typeof e.message === "string" ? e.message : "Check your email"; }
+};
+loadMovies();
+</script></body></html>
