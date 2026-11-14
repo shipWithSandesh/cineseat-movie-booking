@@ -1,6 +1,6 @@
 # 🎬 CineSeat — Movie Ticket Booking (BookMyShow-style)
 
-![CI](https://github.com/Sandesh7777777/cineseat-movie-booking/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/shipWithSandesh/cineseat-movie-booking/actions/workflows/ci.yml/badge.svg)
 
 A movie booking app — browse movies, pick a show, choose seats on a live seat map, and book — built to showcase **test automation across every layer**.
 
